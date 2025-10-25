@@ -78,7 +78,7 @@ class DeepSeekStockAdvisor:
             prev_date = date - timedelta(days=3)
         
         prompt = f"""
-你是一位专业的股票投资顾问，具有丰富的A股市场分析经验。请基于以下要求为我推荐今日（{date.strftime('%Y年%m月%d日')}）值得关注的A股股票，非科创板：
+你是一位专业的股票投资顾问，具有丰富的A股市场分析经验。请基于以下要求为我推荐今日早盘（已开盘）（{date.strftime('%Y年%m月%d日')}）值得关注的A股股票，非科创板：
 
 ## 分析要求：
 1. 请结合当前经济形势、市场环境、政策导向、行业趋势等因素
@@ -148,7 +148,7 @@ class DeepSeekStockAdvisor:
         payload = {
             "model": model,
             "messages": messages,
-            "temperature": 1.0,
+            "temperature": 1.0, # 对深度思考模型没用，但设置了也不会报错
             "max_tokens": 4000  # R1模型支持更长的输出
         }
         
