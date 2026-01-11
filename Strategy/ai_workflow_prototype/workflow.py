@@ -91,15 +91,36 @@ def call_api(url: str, api_key: str, model: str, messages: List[dict]) -> ModelR
 
 def build_generator_prompt(topic: str, count: int) -> str:
     return f"""
-You are the Generator. Provide {count} candidates for the topic \"{topic}\".
-Return strictly valid JSON with this structure:
+You are the Generator in a workflow prototype for AI-assisted research triage.
+
+Goal:
+Create a short list of {count} items that are *worth monitoring / investigating* for the given topic.
+This is NOT investment advice. Do NOT output buy/sell/target-price language.
+
+Context & constraints:
+- Treat the output as a daily briefing draft for a human reviewer.
+- You MUST avoid claiming real-time or “today” news unless you provide a verifiable source link.
+- Do NOT invent specific numbers (returns, precise growth %, exact dates, “breaking news”, etc.).
+- Prefer stable, general, checkable rationales (business model, macro exposure, known catalysts like earnings season, sector trends).
+- "symbol" is a short identifier. For market topics use a ticker (e.g., AAPL). For non-market topics use a short code-like name.
+
+Quality bar for each item:
+- thesis_bullets: 1–3 concise bullets answering “why it’s worth monitoring” + “what to verify next”.
+- risks: 1–3 realistic risks / failure modes (not generic).
+- time_horizon: choose one of "short", "medium", "long".
+- confidence: use a float 0.0–1.0 (preferred) or one of "low"/"med"/"high".
+- evidence_links: at least one entry. If you cannot cite a link, use ["N/A"] rather than inventing URLs.
+- model: must be "deepseek".
+- disclaimers: one sentence stating it is a workflow demo and requires human verification.
+
+Return STRICTLY valid JSON with this exact structure (double quotes, no trailing commas):
 {{
   "recommendations": [
     {{
       "symbol": "...",
       "thesis_bullets": ["...", "..."],
       "time_horizon": "short/medium/long",
-      "confidence": 0.0-1.0 or "low/med/high",
+      "confidence": 0.0,
       "risks": ["..."],
       "evidence_links": ["N/A"],
       "model": "deepseek",
@@ -107,31 +128,51 @@ Return strictly valid JSON with this structure:
     }}
   ]
 }}
+
+Topic: "{topic}"
+
 Output JSON only. No extra text.
 """.strip()
 
 
 def build_critic_prompt(topic: str, generator_json: str) -> str:
     return f"""
-You are the Critic. Identify gaps, missing evidence, and uncertainties in the Generator output.
-Return strictly valid JSON:
+You are the Critic (QA + risk control) in a workflow prototype.
+
+Task:
+Review the Generator output and flag:
+1) Unsupported / unverifiable claims (especially anything that sounds like real-time news).
+2) Overconfident language or implicit advice (buy/sell/guarantees/price targets).
+3) Missing evidence: thesis or risks that should have sources or clear next-step verification.
+4) Vague or generic bullets that are not actionable.
+5) Schema problems: missing fields, wrong types, empty lists, too many bullets, invalid time_horizon/confidence values, etc.
+
+Rules:
+- Do NOT rewrite the recommendations. Only critique them.
+- Produce one critique per symbol present in the Generator output.
+- issues: 1–3 short, specific issues (actionable).
+- evidence_links: include 1–2 links that would verify the claim if you can; otherwise use ["N/A"] (do not fabricate URLs).
+- uncertainty: one sentence summarizing the overall reliability of that item (e.g., "High uncertainty due to missing sources").
+
+Return STRICTLY valid JSON with this structure (double quotes, no trailing commas):
 {{
   "critiques": [
     {{
       "symbol": "...",
-      "issues": ["..."],
+      "issues": ["...", "..."],
       "evidence_links": ["N/A"],
       "uncertainty": "..."
     }}
   ]
 }}
-Output JSON only. No extra text.
 
-Topic: {topic}
+Topic: "{topic}"
+
 Generator output:
 {generator_json}
-""".strip()
 
+Output JSON only. No extra text.
+""".strip()
 
 def parse_with_retry(model_fn, prompt: str, schema, max_attempts: int = 2) -> BaseModel:
     last_error = None
